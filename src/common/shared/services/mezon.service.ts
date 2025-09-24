@@ -6,7 +6,11 @@ import {
   ReactMessageChannel,
   ReplyMezonMessage,
 } from '@src/common/dtos/replyMessage.dto';
-import { ApiMessageMention, MezonClient } from 'mezon-sdk';
+import {
+  ApiMessageMention,
+  ChannelMessageContent,
+  MezonClient,
+} from 'mezon-sdk';
 
 @Injectable()
 export class MezonClientService {
@@ -58,14 +62,11 @@ export class MezonClientService {
     }
   }
 
-  async sendMessageToUser(messageToUser: ReplyMezonMessage) {
-    const dmClan = await this.client.clans.fetch('0');
-    const user = await dmClan.users.fetch(messageToUser.userId);
+  async sendMessageToUser(userId: string, message: ChannelMessageContent) {
+    const dmClan = await this.client.clans.fetch('1779484504377790464');
+    const user = await dmClan.users.fetch(userId);
     try {
-      return await user.sendDM({
-        t: messageToUser.textContent,
-        ...messageToUser.messOptions,
-      });
+      return await user.sendDM(message);
     } catch (error) {
       throw error;
     }

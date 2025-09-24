@@ -1,4 +1,4 @@
-import { Global, Module, type Provider } from '@nestjs/common';
+import { Global, Logger, Module, type Provider } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { MezonClientService } from '@src/common/shared/services/mezon.service';
@@ -16,10 +16,16 @@ const providers: Provider[] = [
   {
     provide: 'MEZON_CLIENT',
     useFactory: async (config: AppConfigService) => {
-      const token = config.botToken;
-      const client = new MezonClient(token);
-      await client.login();
-      return client;
+      try {
+        const token = config.botToken;
+        const client = new MezonClient(token);
+        await client.login();
+        Logger.log('Mezon client logged in successfully');
+        return client;
+      } catch (error) {
+        console.error(error);
+        throw error;
+      }
     },
     inject: [AppConfigService],
   },

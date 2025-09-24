@@ -11,6 +11,7 @@ import { replyMessageGenerate } from '@src/common/utils/generateReplyMessage';
 import { vnLocalDateTime } from '@src/common/utils/time.util';
 import { DeptService } from '@src/dept/dept.service';
 import { BillService } from '@src/modules/bill/bill.services';
+import SchedulerJobEntity from '@src/modules/scheduler-job/scheduler-job.entity';
 import { SchedulerJobService } from '@src/modules/scheduler-job/scheduler-job.service';
 import { UserService } from '@src/user/user.service';
 import { ChannelMessage } from 'mezon-sdk';
@@ -38,23 +39,11 @@ export class SchedulerJobSHandler {
       return this.invalidCommandWarning(message);
     }
     if (target === 'all') {
-      const deptOrders = (
-        (await this.deptService.getListDeptByOwner(message.sender_id)) || []
-      ).filter((order) => order.status !== OrderStatus.CANCELED);
-      if (!deptOrders.length) {
-        const messageToSend = replyMessageGenerate(
-          { messageContent: 'Không có đơn hàng nợ nào' },
-          message,
-        );
-        await this.mezonService.sendMessage(messageToSend);
-        return;
-      }
-
-      await this.handleAndDeliveryDeptWarning(
-        deptOrders,
-        repeat as string,
+      return this.handleRemindAllDept({
         message,
-      );
+        repeat: repeat as string,
+        ownerId,
+      });
     }
     const mezonUsers = await this.userService.getManyByIdsAndUsernames({
       ids: users,
@@ -81,10 +70,68 @@ export class SchedulerJobSHandler {
     await this.handleAndDeliveryDeptWarning(orders, repeat as string, message);
   }
 
+  private async handleRemindAllDept({
+    message,
+    repeat,
+    ownerId,
+  }: {
+    message: ChannelMessage;
+    repeat: string;
+    ownerId: string;
+  }) {
+    const deptOrders = (
+      (await this.deptService.getListDeptByOwner(message.sender_id)) || []
+    ).filter(
+      (order) =>
+        order.status !== OrderStatus.CANCELED || order.senderId !== ownerId,
+    );
+    if (!deptOrders.length) {
+      const messageToSend = replyMessageGenerate(
+        { messageContent: 'Không có đơn hàng nợ nào' },
+        message,
+      );
+      await this.mezonService.sendMessage(messageToSend);
+      return;
+    }
+    const existingJobs = await this.schedulerJobService.getJobsByOrderIds(
+      deptOrders.map((o) => o.id),
+    );
+    if (existingJobs.length) {
+      await this.replyRemindedOrders(existingJobs, message);
+    }
+    await this.handleAndDeliveryDeptWarning(
+      deptOrders.filter((o) => !existingJobs.find((j) => j.orderId === o.id)),
+      repeat,
+      message,
+    );
+  }
+
+  private async replyRemindedOrders(
+    existingJobs: SchedulerJobEntity[],
+    message: ChannelMessage,
+  ) {
+    const messageContent = `Các order đã được tạo nhắc nhở: \n${existingJobs
+      .map(
+        (job) =>
+          `ID: ${job.id} - User: ${job.senderName} - Order: ${job.content.toUpperCase()} - ` +
+          `Nhắc nhở tiếp theo vào ${vnLocalDateTime(job.nextTime)} - ` +
+          `Tần suất nhắc nhở: ${job.repeat}`,
+      )
+      .join('\n')}`;
+    const replyMessage = replyMessageGenerate(
+      {
+        messageContent,
+        mk: [{ type: 'pre', s: 0, e: messageContent.length + 6 }],
+      },
+      message,
+    );
+    await this.mezonService.sendMessage(replyMessage);
+  }
+
   @OnEvent(AppEventEnum.DEPT_REMINDER_LIST)
   async handleDeptReminderList(message: ChannelMessage) {
     const ownerId = message.sender_id;
-    const billQueryBuilder = await this.billSerrvice.getQueryBuilder();
+    const billQueryBuilder = this.billSerrvice.getQueryBuilder();
     const bills = await billQueryBuilder
       .leftJoinAndSelect(
         'bill.orders',
@@ -131,6 +178,13 @@ export class SchedulerJobSHandler {
 
   @OnEvent(AppEventEnum.DEPT_REMINDER_CANCEL)
   async handleDeptReminderCancel(message: ChannelMessage) {
+    if (DeptCommand.isCancelAllReminderCommand(message.content.t)) {
+      const ownerId = message.sender_id;
+      await this.schedulerJobService.deleteAllJobByOwnerId(ownerId);
+      await this.replyCancelRemindedSuccess(message);
+      return;
+    }
+
     const jobId = DeptCommand.parseCancelReminderCommand(message.content.t);
     if (!jobId) {
       const messageToSend = replyMessageGenerate(
@@ -150,6 +204,10 @@ export class SchedulerJobSHandler {
       return;
     }
     await this.schedulerJobService.deleteJobById(jobId);
+    await this.replyCancelRemindedSuccess(message);
+  }
+
+  private async replyCancelRemindedSuccess(message: ChannelMessage) {
     const messageToSend = replyMessageGenerate(
       { messageContent: `Đã hủy nhắc nhở thành công` },
       message,
@@ -162,15 +220,17 @@ export class SchedulerJobSHandler {
     repeat: string,
     message: ChannelMessage,
   ) {
-    const messageContent = !orders?.length
-      ? 'Không tìm thấy user nào của người dùng'
-      : `Danh sách order chưa trả tiền:\n${orders
-          .map(
-            (order) =>
-              `<${order.senderName}>: Order ${order.content.toUpperCase()} - ` +
-              vnLocalDateTime(order.createdAt),
-          )
-          .join('\n')}`;
+    if (!orders?.length) {
+      return;
+    }
+    const messageContent =
+      `Danh sách order chưa trả tiền:\n${orders
+        .map(
+          (order) =>
+            `<${order.senderName}>: Order ${order.content.toUpperCase()} - ` +
+            vnLocalDateTime(order.createdAt),
+        )
+        .join('\n')}` + 'Đã ping user đòi tiền';
     const messageToSend = replyMessageGenerate(
       {
         messageContent,
@@ -179,7 +239,6 @@ export class SchedulerJobSHandler {
       message,
     );
     await this.mezonService.sendMessage(messageToSend);
-
     await this.schedulerJobService.createJobs(
       orders.map((o) => ({
         repeat,
@@ -193,11 +252,7 @@ export class SchedulerJobSHandler {
     );
     await this.schedulerJobService.pingUserWarning(orders);
   }
-  // private async validateUsers(targetUsers: string[]) {
-  //   const mezonClient = this.mezonService.getClient();
-  //   const user = await mezonClient.clans.fetch('1969393191673139200');
-  //   console.log({ targetUsers, user });
-  // }
+
   private async invalidCommandWarning(message: ChannelMessage) {
     const mesageContetnt =
       'Hãy nhập đúng lệnh theo format:\n' +

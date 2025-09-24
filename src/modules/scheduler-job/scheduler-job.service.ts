@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MezonClientService } from '@src/common/shared/services/mezon.service';
 import { sleep } from '@src/common/utils';
 import { vnLocalDateTime } from '@src/common/utils/time.util';
+import { BillService } from '@src/modules/bill/bill.services';
 import SchedulerJobEntity from '@src/modules/scheduler-job/scheduler-job.entity';
 import ms from 'ms';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
@@ -22,6 +23,7 @@ export class SchedulerJobService {
   constructor(
     @InjectRepository(SchedulerJobEntity)
     private readonly schedulerJobRepository: Repository<SchedulerJobEntity>,
+    private billService: BillService,
     private mezonService: MezonClientService,
   ) {}
 
@@ -52,27 +54,36 @@ export class SchedulerJobService {
   }
 
   async pingUserWarning(deptOrders: UserWarning[]) {
-    for (const {
-      channelId,
-      content,
-      createdAt,
-      senderId,
-      senderName,
-    } of deptOrders) {
+    for (const { content, createdAt, senderId, channelId } of deptOrders) {
+      const messageContent =
+        `Đừng quên trả nợ order: ${content.toLocaleUpperCase()}` +
+        (createdAt ? ' - lúc ' + vnLocalDateTime(createdAt) : '') +
+        ' tại channel ';
+      const channelTextPlaceHolder = '#channel';
       const message = {
-        t:
-          `Con vợ ${senderName} trả nợ order: ${content.toLocaleUpperCase()} ` +
-          (createdAt ? ' - lúc ' + vnLocalDateTime(createdAt) : '') +
-          ' đê !!!',
+        t: messageContent + channelTextPlaceHolder,
+        hg: [
+          {
+            channelid: channelId,
+            s: messageContent.length,
+            e: messageContent.length + 1 + channelTextPlaceHolder.length,
+          },
+        ],
       };
-      const mentions = [{ user_id: senderId, s: 7, e: senderName.length + 7 }];
-      await this.mezonService.sendMessageToChannel(
-        channelId,
-        message,
-        mentions,
-      );
+
+      await this.mezonService.sendMessageToUser(senderId, message);
       await sleep(500);
     }
+  }
+
+  async deleteAllJobByOwnerId(userId: string): Promise<void> {
+    const bills = await this.billService
+      .getQueryBuilder()
+      .leftJoinAndSelect('bill.orders', 'order')
+      .where('order.senderId = :userId', { userId })
+      .getMany();
+    const orderIds = bills.flatMap((b) => b.orders.map((o) => o.id));
+    await this.schedulerJobRepository.delete({ orderId: In(orderIds) });
   }
 
   @Cron(CronExpression.EVERY_MINUTE)

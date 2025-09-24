@@ -87,14 +87,16 @@ export class BotHandler {
         '*order <nội dung>: Ghi nợ tương tự bot order\n' +
         '*order cancel: Hủy đơn đã đặt gần nhất trong ngày và xóa khỏi bill\n' +
         '*chotdon: Chốt order và tạo bill\n' +
-        '*themdon: Sau khi chốt đơn, thêm đơn vào bill truoc đó\n' +
+        '*themdon: Sau khi chốt đơn, thêm đơn vào bill trước đó\n' +
         '*listno: Liệt kê danh sách ghi nợ (Không phân biệt clan và channel)\n' +
         '*doino all <repeat>: Nhắc nhở tất cả mọi người đang nợ theo tần suất lặp lại\n' +
         '*doino @user1 @user2 <repeat>: Nhắc nhở những người được tag theo tần suất lặp lại (hỗ trợ mention và username)\n' +
         '! Note: <repeat> là tần suất nhắc nhở. Hỗ trợ phút(m), giờ(h), ngày(d)\n' +
         'Ví dụ: *doino user.name 2h\n' +
         '*doino list: Liệt kê các nhắc nhở đang hoạt động\n' +
-        '*doino cancel <id>: Hủy nhắc nhở theo jobId trong lệnh *doino list\n';
+        '*doino cancel <id> | all: Hủy nhắc nhở theo jobId trong lệnh *doino list\n' +
+        '*doino confirm: Bot nhắn tin list nợ qua DM để confirm\n';
+
       const messageToSend = replyMessageGenerate(
         {
           messageContent: content,
@@ -125,10 +127,10 @@ export class BotHandler {
         { clan_id: message.clan_id, clan_nick: message.clan_nick },
       ],
     });
-    const channelId = message.channel_id;
-    if (channelId !== '1841290471456903168') {
-      return;
-    }
+    // const channelId = message.channel_id;
+    // if (channelId !== '1841290471456903168') {
+    //   return;
+    // }
     [
       this.verifyAndDeliveryNewOrderEvent,
       this.verifyAndDeliveryCancelOrderEvent,

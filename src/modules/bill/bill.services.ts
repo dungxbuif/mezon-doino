@@ -19,7 +19,7 @@ export class BillService {
     return this.billRepo.find(options);
   }
 
-  async getQueryBuilder() {
+  getQueryBuilder() {
     return this.billRepo.createQueryBuilder('bill');
   }
 

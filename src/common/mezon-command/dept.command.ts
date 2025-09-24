@@ -100,6 +100,14 @@ export default class DeptCommand {
     return message?.startsWith('*doino cancel') === true;
   }
 
+  static isCancelAllReminderCommand(message = ''): boolean {
+    return message?.trim() === '*doino cancel all';
+  }
+
+  static isShowConfirm(message = ''): boolean {
+    return message?.trim() === '*doino confirm';
+  }
+
   static parseCancelReminderCommand(message = ''): number | null {
     if (!this.isCancelReminderCommand(message)) {
       return null;
