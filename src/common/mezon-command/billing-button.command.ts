@@ -5,13 +5,11 @@ export default class BillingButton {
   static cancelKey = 'cancel_pay';
   static notConfirmKey = 'not_confirm_pay';
 
-  static isConfirm(message: MessageButtonClicked) {
-    return message.button_id.startsWith(BillingButton.confirmKey + '_');
-  }
-  static isCancel(message: MessageButtonClicked) {
-    return message.button_id.startsWith(BillingButton.cancelKey + '_');
-  }
-  static isNotConfirm(message: MessageButtonClicked) {
-    return message.button_id.startsWith(BillingButton.notConfirmKey + '_');
+  static isBillingButton(event: MessageButtonClicked) {
+    return [
+      BillingButton.confirmKey,
+      BillingButton.cancelKey,
+      BillingButton.notConfirmKey,
+    ].includes(event.button_id);
   }
 }

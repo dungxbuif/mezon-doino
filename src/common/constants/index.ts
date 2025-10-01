@@ -4,9 +4,7 @@ export enum AppEventEnum {
 
   ORDER_STATUS_UPDATED = 'order.status_updated',
 
-  ORDER_CLICKED_CONFIRM = 'order.clicked_confirm',
-  ORDER_CLICKED_CANCEL = 'order.clicked_cancel',
-  ORDER_CLICKED_NOT_CONFIRM = 'order.clicked_not_confirm',
+  BILLING_BUTTON_CLICKED = 'billing.button_clicked',
 
   BILL_CREATED = 'bill.created',
   BILL_ADD_ORDER = 'bill.add_order',

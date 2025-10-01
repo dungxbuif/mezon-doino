@@ -4,7 +4,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { AppEventEnum } from '@src/common/constants';
 import BillEntity from '@src/common/database/bill.entity';
 import OrderEntity from '@src/common/database/order.entity';
-import { OrderStatus } from '@src/common/enums';
+import { MezonFormKey, OrderStatus } from '@src/common/enums';
 import BillingButton from '@src/common/mezon-command/billing-button.command';
 import { MezonClientService } from '@src/common/shared/services/mezon.service';
 import { getRandomColor } from '@src/common/utils';
@@ -17,6 +17,8 @@ import {
   ChannelMessage,
   EButtonMessageStyle,
   EMessageComponentType,
+  IInteractiveMessageProps,
+  IMessageActionRow,
 } from 'mezon-sdk';
 import { MessageButtonClicked } from 'mezon-sdk/dist/cjs/rtapi/realtime';
 import { In, IsNull } from 'typeorm';
@@ -114,12 +116,38 @@ export class BillCommandHandler {
 
   @OnEvent(AppEventEnum.BILL_ADD_ORDER)
   async addOrderToLatestBill(message: ChannelMessage) {
+    const ownerId = message.sender_id;
     const channelId = message.channel_id;
     const latestBill = await this.billService.getLatestBillByChannel(channelId);
     if (!latestBill) {
-      this.logger.log(
-        `No existing bill found for channel ${channelId} today. Cannot add order to bill.`,
+      const messageToSend = replyMessageGenerate(
+        {
+          messageContent: 'Bạn không có hóa đơn nào gần đây',
+        },
+        message,
       );
+      await this.mezonService.sendMessage(messageToSend);
+      return;
+    }
+    if (latestBill.ownerId !== ownerId) {
+      const messageToSend = replyMessageGenerate(
+        {
+          messageContent: 'Bạn không có hóa đơn nào gần đây',
+        },
+        message,
+      );
+      await this.mezonService.sendMessage(messageToSend);
+      return;
+    }
+    const newOrders = await this.orderService.getNewOrdersByChannel(channelId);
+    if (!newOrders?.length) {
+      const messageToSend = replyMessageGenerate(
+        {
+          messageContent: 'Không có order mới để thêm vào bill',
+        },
+        message,
+      );
+      await this.mezonService.sendMessage(messageToSend);
       return;
     }
     await this.orderService.update(
@@ -131,28 +159,44 @@ export class BillCommandHandler {
       },
       { billId: latestBill.id },
     );
-    this.logger.log(
-      `Added order ${message.message_id} to latest bill ${latestBill.id} for channel ${channelId}`,
+    const messageContent = `Đã thêm ${newOrders.length} order vào bill`;
+    const response = replyMessageGenerate(
+      {
+        messageContent,
+      },
+      message,
     );
+    await this.mezonService.sendMessage(response);
   }
 
-  @OnEvent(AppEventEnum.ORDER_CLICKED_CONFIRM)
-  @OnEvent(AppEventEnum.ORDER_CLICKED_CANCEL)
-  @OnEvent(AppEventEnum.ORDER_CLICKED_NOT_CONFIRM)
-  async confirmOrder(message: MessageButtonClicked) {
+  @OnEvent(AppEventEnum.BILLING_BUTTON_CLICKED)
+  async onBillingButtonClicked(message: MessageButtonClicked) {
     let newStatus = OrderStatus.NEW;
-    const isConfirm = BillingButton.isConfirm(message);
-    const isCancel = BillingButton.isCancel(message);
+    const buttonId = message.button_id;
+    const isConfirm = BillingButton.confirmKey === buttonId;
+    const isCancel = BillingButton.cancelKey === buttonId;
     if (isConfirm) {
       newStatus = OrderStatus.CONFIRMED;
     }
     if (isCancel) {
       newStatus = OrderStatus.CANCELED;
     }
-    const orderId = message.button_id
-      .replace(`${BillingButton.notConfirmKey}_`, '')
-      .replace(`${BillingButton.confirmKey}_`, '')
-      .replace(`${BillingButton.cancelKey}_`, '');
+    let orderId = '';
+    try {
+      const data = JSON.parse(message.extra_data) as Record<string, string>;
+      orderId = data[MezonFormKey.SELECT.DEPT_USER];
+    } catch (error) {
+      this.logger.error(
+        `Failed to parse extra_data for message ${message.message_id}: ${error}`,
+      );
+      return;
+    }
+    if (!orderId) {
+      this.logger.warn(
+        `No orderId found in extra_data for message ${message.message_id}`,
+      );
+      return;
+    }
     const userId = message.user_id;
     const order = await this.orderService.findOne({
       where: { id: orderId },
@@ -175,7 +219,6 @@ export class BillCommandHandler {
       status: newStatus,
     });
   }
-
   @OnEvent(AppEventEnum.ORDER_STATUS_UPDATED)
   async handlerOrderStatusUpdated({
     orderId,
@@ -263,59 +306,79 @@ export class BillCommandHandler {
     {
       const color = getRandomColor();
       const title = 'HÓA ĐƠN GHI NỢ';
-      const components: any = [];
-      orders.forEach((ord) => {
-        const com = [
-          {
-            type: EMessageComponentType.BUTTON,
-            id: `${BillingButton.confirmKey}_${ord.id}`,
-            component: {
-              label: `${ord.senderName} (PAID)`,
-              style: EButtonMessageStyle.SUCCESS,
+      const components: IMessageActionRow[] = [
+        {
+          components: [
+            {
+              type: EMessageComponentType.BUTTON,
+              id: BillingButton.confirmKey,
+              component: {
+                label: 'ĐÃ THANH TOÁN',
+                style: EButtonMessageStyle.SUCCESS,
+              },
             },
-          },
-          {
-            type: EMessageComponentType.BUTTON,
-            id: `${BillingButton.cancelKey}_${ord.id}`,
-            component: {
-              label: `${ord.senderName} (CANCELED)`,
-              style: EButtonMessageStyle.DANGER,
+            {
+              type: EMessageComponentType.BUTTON,
+              id: 'BillingButton.cancelKey',
+              component: {
+                label: 'HỦY ĐƠN',
+                style: EButtonMessageStyle.DANGER,
+              },
             },
-          },
-          {
-            type: EMessageComponentType.BUTTON,
-            id: `${BillingButton.notConfirmKey}_${ord.id}`,
-            component: {
-              label: `${ord.senderName} (CHƯA XÁC NHẬN)`,
-              style: EButtonMessageStyle.SECONDARY,
+            {
+              type: EMessageComponentType.BUTTON,
+              id: `${BillingButton.notConfirmKey}`,
+              component: {
+                label: 'CHƯA XÁC NHẬN',
+                style: EButtonMessageStyle.SECONDARY,
+              },
             },
-          },
-        ];
+          ],
+        },
+      ];
 
-        components.push({
-          components: com,
-        });
-      });
       const blockCode = '```';
       const isPaid = (status: OrderStatus) => status === OrderStatus.CONFIRMED;
       const isCanceled = (status: OrderStatus) =>
         status === OrderStatus.CANCELED;
-
-      const embed = [
+      const ordersList: string[] = [];
+      const orderOptions: Array<{
+        label: string;
+        value: string;
+      }> = [];
+      orders.forEach((ord, index) => {
+        orderOptions.push({
+          label: `${ord.senderName}: order [${ord.content.toUpperCase()}]`,
+          value: ord.id,
+        });
+        ordersList.push(
+          `${index + 1}. ${ord.senderName}: order [${ord.content.toUpperCase()}] ` +
+            `${isPaid(ord.status) ? '✅' : ''} ${isCanceled(ord.status) ? '❌' : ''}`,
+        );
+      });
+      const embed: IInteractiveMessageProps[] = [
         {
           color,
           title: `${title}`,
           description:
             `(✅: Xác nhận đã thanh toán, ❌: Hủy đơn)` +
-            `${blockCode}${orders
-              .map(
-                (ord, index) =>
-                  `${index + 1}. ${ord.senderName}: order [${ord.content.toUpperCase()}] ` +
-                  `${isPaid(ord.status) ? '✅' : ''} ${isCanceled(ord.status) ? '❌' : ''}`,
-              )
-              .join(
-                '\n',
-              )}${blockCode}\n${'(Chọn số để xác nhận thanh toán: Xanh - Đã thanh toán, Đỏ - Hủy)'}`,
+            `${blockCode}${ordersList.join('\n')}${blockCode}`,
+          fields: [
+            {
+              name: '',
+              value: `Chọn order muốn cập nhật:`,
+              inputs: {
+                id: MezonFormKey.SELECT.DEPT_USER,
+                type: EMessageComponentType.SELECT,
+                component: {
+                  options: orderOptions,
+                },
+              },
+            },
+          ],
+          footer: {
+            text: '(Chọn số để xác nhận thanh toán: Xanh - Đã thanh toán, Đỏ - Hủy)',
+          },
         },
       ];
       return {

@@ -3,3 +3,9 @@ export enum OrderStatus {
   CONFIRMED,
   CANCELED,
 }
+
+export const MezonFormKey = {
+  SELECT: {
+    DEPT_USER: 'dept_user',
+  },
+};

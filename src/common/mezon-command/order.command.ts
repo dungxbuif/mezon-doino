@@ -12,7 +12,7 @@ export class OrderCommand {
   }
 
   static isConfirmBill(message = ''): boolean {
-    return message?.trim() === '*chotdon';
+    return message?.trim() === '*report order';
   }
 
   static addOrder(message = ''): boolean {

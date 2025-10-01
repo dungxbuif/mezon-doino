@@ -51,20 +51,9 @@ export class BotHandler {
     }
   }
 
-  private async deliveryConfirmBillEvent(message: MessageButtonClicked) {
-    if (BillingButton.isConfirm(message)) {
-      this.emitter.emit(AppEventEnum.ORDER_CLICKED_CONFIRM, message);
-    }
-  }
-  private async deliveryCancelOrderEvent(message: MessageButtonClicked) {
-    if (BillingButton.isCancel(message)) {
-      this.emitter.emit(AppEventEnum.ORDER_CLICKED_CANCEL, message);
-    }
-  }
-
-  private async deliveryNotConfirmOrderEvent(message: MessageButtonClicked) {
-    if (BillingButton.isNotConfirm(message)) {
-      this.emitter.emit(AppEventEnum.ORDER_CLICKED_NOT_CONFIRM, message);
+  private async deliveryBillingButtonClick(message: MessageButtonClicked) {
+    if (BillingButton.isBillingButton(message)) {
+      this.emitter.emit(AppEventEnum.BILLING_BUTTON_CLICKED, message);
     }
   }
 
@@ -86,7 +75,7 @@ export class BotHandler {
         'Hướng dẫn sử dụng bot *doino:\n' +
         '*order <nội dung>: Ghi nợ tương tự bot order\n' +
         '*order cancel: Hủy đơn đã đặt gần nhất trong ngày và xóa khỏi bill\n' +
-        '*chotdon: Chốt order và tạo bill\n' +
+        '*report order: Chốt order và tạo bill\n' +
         '*themdon: Sau khi chốt đơn, thêm đơn vào bill trước đó\n' +
         '*listno: Liệt kê danh sách ghi nợ (Không phân biệt clan và channel)\n' +
         '*doino all <repeat>: Nhắc nhở tất cả mọi người đang nợ theo tần suất lặp lại\n' +
@@ -147,11 +136,8 @@ export class BotHandler {
   }
 
   private async handleButtonClicked(event: MessageButtonClicked) {
-    [
-      this.deliveryConfirmBillEvent,
-      this.deliveryCancelOrderEvent,
-      this.deliveryNotConfirmOrderEvent,
-    ].forEach((cb) => {
+    console.log('Button clicked event received:', event);
+    [this.deliveryBillingButtonClick].forEach((cb) => {
       cb.call(this, event);
     });
   }
