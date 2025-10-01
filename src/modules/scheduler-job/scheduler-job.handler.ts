@@ -53,7 +53,7 @@ export class SchedulerJobSHandler {
       this.logger.warn(`No users found for message: ${message.content?.t}`);
       return;
     }
-    const billQueryBuilder = await this.billSerrvice.getQueryBuilder();
+    const billQueryBuilder = this.billSerrvice.getQueryBuilder();
     const bills = await billQueryBuilder
       .leftJoinAndSelect(
         'bill.orders',

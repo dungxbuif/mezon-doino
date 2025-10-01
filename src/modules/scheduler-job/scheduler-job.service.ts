@@ -80,7 +80,7 @@ export class SchedulerJobService {
     const bills = await this.billService
       .getQueryBuilder()
       .leftJoinAndSelect('bill.orders', 'order')
-      .where('order.senderId = :userId', { userId })
+      .where('bill.ownerId = :ownerId', { ownerId: userId })
       .getMany();
     const orderIds = bills.flatMap((b) => b.orders.map((o) => o.id));
     await this.schedulerJobRepository.delete({ orderId: In(orderIds) });
