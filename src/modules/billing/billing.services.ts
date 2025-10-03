@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import BillEntity from '@src/common/database/bill.entity';
+import OrderEntity from '@src/common/database/order.entity';
 import { withinVnDayTypeOrmQuery } from '@src/common/utils/time.util';
 import { FindManyOptions, FindOptionsWhere, Repository } from 'typeorm';
 
 @Injectable()
-export class BillService {
+export class BillingService {
   constructor(
     @InjectRepository(BillEntity)
     private billRepo: Repository<BillEntity>,
@@ -17,6 +18,35 @@ export class BillService {
 
   async getMany(options: FindManyOptions<BillEntity>) {
     return this.billRepo.find(options);
+  }
+
+  async getBillingOrdersByOrderId(orderId: string): Promise<OrderEntity[]> {
+    const bills = await this.billRepo
+      .createQueryBuilder('bill')
+      .leftJoinAndSelect('bill.orders', 'orders')
+      .where('orders.id = :orderId', { orderId })
+      .getMany();
+    return bills.flatMap((bill) => bill.orders);
+  }
+  async getLatestBillByChannel(channelId: string) {
+    return this.billRepo.findOne({
+      where: {
+        channelId,
+        createdAt: withinVnDayTypeOrmQuery(),
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getLatestBillWithOrdersByChannel(channelId: string) {
+    return this.billRepo.findOne({
+      where: {
+        channelId,
+        createdAt: withinVnDayTypeOrmQuery(),
+      },
+      relations: ['orders'],
+      order: { createdAt: 'DESC' },
+    });
   }
 
   getQueryBuilder() {
@@ -39,26 +69,5 @@ export class BillService {
     updateData: Partial<BillEntity>,
   ) {
     await this.billRepo.update(criteria, updateData);
-  }
-
-  async getLatestBillByChannel(channelId: string) {
-    return this.billRepo.findOne({
-      where: {
-        channelId,
-        createdAt: withinVnDayTypeOrmQuery(),
-      },
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  async getLatestBillWithOrdersByChannel(channelId: string) {
-    return this.billRepo.findOne({
-      where: {
-        channelId,
-        createdAt: withinVnDayTypeOrmQuery(),
-      },
-      relations: ['orders'],
-      order: { createdAt: 'DESC' },
-    });
   }
 }

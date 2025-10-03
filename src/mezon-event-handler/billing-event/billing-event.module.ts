@@ -7,4 +7,4 @@ import { OrderModule } from '@src/modules/order/order.module';
   imports: [BillingModule, OrderModule],
   providers: [BillingHandler],
 })
-export default class BillCommandHandlerModule {}
+export default class BillingEventModule {}

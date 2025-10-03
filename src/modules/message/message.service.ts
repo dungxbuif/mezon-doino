@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import BillingMessageEntity from '@src/common/database/bill-message.entity';
+import BillingMessageEntity from '@src/common/database/message.entity';
 import { FindManyOptions, FindOptionsWhere, Repository } from 'typeorm';
 
 @Injectable()
-export class BillingMessageService {
+export class MessageService {
   constructor(
     @InjectRepository(BillingMessageEntity)
     private billingMessageRepo: Repository<BillingMessageEntity>,

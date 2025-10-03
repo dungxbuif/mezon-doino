@@ -2,12 +2,15 @@
 /* eslint-disable sonarjs/no-useless-catch */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Inject, Injectable } from '@nestjs/common';
+import { KOMU_CLAN_ID } from '@src/common/constants';
 import {
   ReactMessageChannel,
   ReplyMezonMessage,
 } from '@src/common/dtos/replyMessage.dto';
+import { replyMessageGenerate } from '@src/common/utils/generateReplyMessage';
 import {
   ApiMessageMention,
+  ChannelMessage,
   ChannelMessageContent,
   MezonClient,
 } from 'mezon-sdk';
@@ -20,6 +23,13 @@ export class MezonClientService {
     return this.client;
   }
 
+  async sendReplyMessage(
+    channelMessageContent: Record<string, any>,
+    message: ChannelMessage,
+  ) {
+    const messageToSend = replyMessageGenerate(channelMessageContent, message);
+    await this.sendMessage(messageToSend);
+  }
   async sendMessage(replyMessage: ReplyMezonMessage) {
     try {
       const channel = await this.client.channels.fetch(replyMessage.channel_id);
@@ -63,7 +73,7 @@ export class MezonClientService {
   }
 
   async sendMessageToUser(userId: string, message: ChannelMessageContent) {
-    const dmClan = await this.client.clans.fetch('1779484504377790464');
+    const dmClan = await this.client.clans.fetch(KOMU_CLAN_ID);
     const user = await dmClan.users.fetch(userId);
     try {
       return await user.sendDM(message);

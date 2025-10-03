@@ -13,6 +13,11 @@ export enum AppEventEnum {
   DEPT_SCHEDULED = 'dept.scheduled',
   DEPT_REMINDER_LIST = 'dept.reminder.list',
   DEPT_REMINDER_CANCEL = 'dept.reminder.cancel',
+  DEPT_LIST_CONFIRM = 'dept.list.confirm',
 
   CREATE_USER = 'user.create',
+
+  ORDER_FORM_CREATED = 'order_form.created',
 }
+
+export const KOMU_CLAN_ID = '1779484504377790464';

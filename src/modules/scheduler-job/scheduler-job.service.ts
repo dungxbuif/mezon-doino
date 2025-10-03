@@ -1,3 +1,4 @@
+import { BillingService } from '@src/modules/billing/billing.services';
 /* eslint-disable no-await-in-loop */
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -5,7 +6,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MezonClientService } from '@src/common/shared/services/mezon.service';
 import { sleep } from '@src/common/utils';
 import { vnLocalDateTime } from '@src/common/utils/time.util';
-import { BillService } from '@src/modules/bill/bill.services';
 import SchedulerJobEntity from '@src/modules/scheduler-job/scheduler-job.entity';
 import ms from 'ms';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
@@ -23,7 +23,7 @@ export class SchedulerJobService {
   constructor(
     @InjectRepository(SchedulerJobEntity)
     private readonly schedulerJobRepository: Repository<SchedulerJobEntity>,
-    private billService: BillService,
+    private readonly billingService: BillingService,
     private mezonService: MezonClientService,
   ) {}
 
@@ -77,7 +77,7 @@ export class SchedulerJobService {
   }
 
   async deleteAllJobByOwnerId(userId: string): Promise<void> {
-    const bills = await this.billService
+    const bills = await this.billingService
       .getQueryBuilder()
       .leftJoinAndSelect('bill.orders', 'order')
       .where('bill.ownerId = :ownerId', { ownerId: userId })

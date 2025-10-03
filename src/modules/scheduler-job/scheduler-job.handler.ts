@@ -10,7 +10,7 @@ import { MezonClientService } from '@src/common/shared/services/mezon.service';
 import { replyMessageGenerate } from '@src/common/utils/generateReplyMessage';
 import { vnLocalDateTime } from '@src/common/utils/time.util';
 import { DeptService } from '@src/dept/dept.service';
-import { BillService } from '@src/modules/bill/bill.services';
+import { BillingService } from '@src/modules/billing/billing.services';
 import SchedulerJobEntity from '@src/modules/scheduler-job/scheduler-job.entity';
 import { SchedulerJobService } from '@src/modules/scheduler-job/scheduler-job.service';
 import { UserService } from '@src/user/user.service';
@@ -24,7 +24,7 @@ export class SchedulerJobSHandler {
     private deptService: DeptService,
     private schedulerJobService: SchedulerJobService,
     private userService: UserService,
-    private billSerrvice: BillService,
+    private billingService: BillingService,
   ) {}
 
   @OnEvent(AppEventEnum.DEPT_SCHEDULED)
@@ -53,7 +53,7 @@ export class SchedulerJobSHandler {
       this.logger.warn(`No users found for message: ${message.content?.t}`);
       return;
     }
-    const billQueryBuilder = this.billSerrvice.getQueryBuilder();
+    const billQueryBuilder = this.billingService.getQueryBuilder();
     const bills = await billQueryBuilder
       .leftJoinAndSelect(
         'bill.orders',
@@ -69,69 +69,10 @@ export class SchedulerJobSHandler {
     const orders = bills.flatMap((b) => b.orders);
     await this.handleAndDeliveryDeptWarning(orders, repeat as string, message);
   }
-
-  private async handleRemindAllDept({
-    message,
-    repeat,
-    ownerId,
-  }: {
-    message: ChannelMessage;
-    repeat: string;
-    ownerId: string;
-  }) {
-    const deptOrders = (
-      (await this.deptService.getListDeptByOwner(message.sender_id)) || []
-    ).filter(
-      (order) =>
-        order.status !== OrderStatus.CANCELED || order.senderId !== ownerId,
-    );
-    if (!deptOrders.length) {
-      const messageToSend = replyMessageGenerate(
-        { messageContent: 'Không có đơn hàng nợ nào' },
-        message,
-      );
-      await this.mezonService.sendMessage(messageToSend);
-      return;
-    }
-    const existingJobs = await this.schedulerJobService.getJobsByOrderIds(
-      deptOrders.map((o) => o.id),
-    );
-    if (existingJobs.length) {
-      await this.replyRemindedOrders(existingJobs, message);
-    }
-    await this.handleAndDeliveryDeptWarning(
-      deptOrders.filter((o) => !existingJobs.find((j) => j.orderId === o.id)),
-      repeat,
-      message,
-    );
-  }
-
-  private async replyRemindedOrders(
-    existingJobs: SchedulerJobEntity[],
-    message: ChannelMessage,
-  ) {
-    const messageContent = `Các order đã được tạo nhắc nhở: \n${existingJobs
-      .map(
-        (job) =>
-          `ID: ${job.id} - User: ${job.senderName} - Order: ${job.content.toUpperCase()} - ` +
-          `Nhắc nhở tiếp theo vào ${vnLocalDateTime(job.nextTime)} - ` +
-          `Tần suất nhắc nhở: ${job.repeat}`,
-      )
-      .join('\n')}`;
-    const replyMessage = replyMessageGenerate(
-      {
-        messageContent,
-        mk: [{ type: 'pre', s: 0, e: messageContent.length + 6 }],
-      },
-      message,
-    );
-    await this.mezonService.sendMessage(replyMessage);
-  }
-
   @OnEvent(AppEventEnum.DEPT_REMINDER_LIST)
   async handleDeptReminderList(message: ChannelMessage) {
     const ownerId = message.sender_id;
-    const billQueryBuilder = this.billSerrvice.getQueryBuilder();
+    const billQueryBuilder = this.billingService.getQueryBuilder();
     const bills = await billQueryBuilder
       .leftJoinAndSelect(
         'bill.orders',
@@ -205,6 +146,64 @@ export class SchedulerJobSHandler {
     }
     await this.schedulerJobService.deleteJobById(jobId);
     await this.replyCancelRemindedSuccess(message);
+  }
+
+  private async handleRemindAllDept({
+    message,
+    repeat,
+    ownerId,
+  }: {
+    message: ChannelMessage;
+    repeat: string;
+    ownerId: string;
+  }) {
+    const deptOrders = (
+      (await this.deptService.getListDeptByOwner(message.sender_id)) || []
+    ).filter(
+      (order) =>
+        order.status !== OrderStatus.CANCELED || order.senderId !== ownerId,
+    );
+    if (!deptOrders.length) {
+      const messageToSend = replyMessageGenerate(
+        { messageContent: 'Không có đơn hàng nợ nào' },
+        message,
+      );
+      await this.mezonService.sendMessage(messageToSend);
+      return;
+    }
+    const existingJobs = await this.schedulerJobService.getJobsByOrderIds(
+      deptOrders.map((o) => o.id),
+    );
+    if (existingJobs.length) {
+      await this.replyRemindedOrders(existingJobs, message);
+    }
+    await this.handleAndDeliveryDeptWarning(
+      deptOrders.filter((o) => !existingJobs.find((j) => j.orderId === o.id)),
+      repeat,
+      message,
+    );
+  }
+
+  private async replyRemindedOrders(
+    existingJobs: SchedulerJobEntity[],
+    message: ChannelMessage,
+  ) {
+    const messageContent = `Các order đã được tạo nhắc nhở: \n${existingJobs
+      .map(
+        (job) =>
+          `ID: ${job.id} - User: ${job.senderName} - Order: ${job.content.toUpperCase()} - ` +
+          `Nhắc nhở tiếp theo vào ${vnLocalDateTime(job.nextTime)} - ` +
+          `Tần suất nhắc nhở: ${job.repeat}`,
+      )
+      .join('\n')}`;
+    const replyMessage = replyMessageGenerate(
+      {
+        messageContent,
+        mk: [{ type: 'pre', s: 0, e: messageContent.length + 6 }],
+      },
+      message,
+    );
+    await this.mezonService.sendMessage(replyMessage);
   }
 
   private async replyCancelRemindedSuccess(message: ChannelMessage) {

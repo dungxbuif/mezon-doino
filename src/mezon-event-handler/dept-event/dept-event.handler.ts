@@ -12,6 +12,7 @@ import { ChannelMessage } from 'mezon-sdk';
 export class DeptEventHandler {
   constructor(
     private readonly deptService: DeptService,
+    // private readonly billingService: BillingService,
     private mezonService: MezonClientService,
   ) {}
 
@@ -48,4 +49,31 @@ export class DeptEventHandler {
     );
     await this.mezonService.sendMessage(messageToSend);
   }
+
+  // @OnEvent(AppEventEnum.DEPT_LIST_CONFIRM)
+  // async handleDeptListConfirm(message: ChannelMessage) {
+  //   const ownerId = message.sender_id;
+  //   const orders = await this.deptService.getListDeptByOwner(ownerId);
+  //   if (!orders.length) {
+  //     await this.mezonService.sendReplyMessage(
+  //       { messageContent: 'Không có đơn hàng nợ nào để xác nhận' },
+  //       message,
+  //     );
+  //     return;
+  //   }
+  //   await this.mezonService.sendReplyMessage(
+  //     { messageContent: 'Đã gửi tin nhắn đến DM' },
+  //     message,
+  //   );
+  //   const embedMessage = this.billingService.generateBillMessage(orders);
+  //   const createdBillMessage = await this.mezonService.sendMessageToUser(
+  //     ownerId,
+  //     embedMessage,
+  //   );
+  //   // await this.billingMessageService.create({
+  //   //   billId: bill.id,
+  //   //   messageId: createdBillMessage.message_id,
+  //   //   ownerId,
+  //   // });
+  // }
 }
