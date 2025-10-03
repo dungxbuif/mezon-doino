@@ -22,7 +22,6 @@ export class BillingHandler {
     private billingService: BillingService,
     private mezonService: MezonClientService,
     private eventEmitter: EventEmitter2,
-    // private messageService: MessageService,
   ) {}
 
   @OnEvent(AppEventEnum.BILL_CREATED)
@@ -80,10 +79,14 @@ export class BillingHandler {
         },
         { billId },
       );
-      await this.eventEmitter.emitAsync(AppEventEnum.ORDER_FORM_CREATED, {
-        ...replyMessagePayload,
-        bill: latestBill,
-        orders: finalOrders,
+      this.eventEmitter.emit(AppEventEnum.ORDER_FORM_CREATED, {
+        type: 'reply',
+        reply: {
+          ...replyMessagePayload,
+          bill: latestBill,
+          orders: finalOrders,
+          type: 'reply',
+        },
       });
       return;
     }
@@ -99,10 +102,14 @@ export class BillingHandler {
         (order) => order.billId === latestBill?.id,
       );
 
-      await this.eventEmitter.emitAsync(AppEventEnum.ORDER_FORM_CREATED, {
-        ...replyMessagePayload,
-        bill: latestBill,
-        orders: finalOrders,
+      this.eventEmitter.emit(AppEventEnum.ORDER_FORM_CREATED, {
+        type: 'reply',
+        reply: {
+          ...replyMessagePayload,
+          bill: latestBill,
+          orders: finalOrders,
+          type: 'reply',
+        },
       });
     }
   }
@@ -166,6 +173,10 @@ export class BillingHandler {
   @OnEvent(AppEventEnum.BILLING_BUTTON_CLICKED)
   async onBillingButtonClicked(message: MessageButtonClicked) {
     const newStatus = this.getButonClickStatus(message.button_id);
+    if (!message?.extra_data) {
+      this.logger.warn(`No extra_data found in message ${message.message_id}`);
+      return;
+    }
     const orderId = this.getButtonClickOrderId({
       extraData: message.extra_data,
       messageId: message.message_id,
@@ -192,6 +203,7 @@ export class BillingHandler {
       status: newStatus,
     });
   }
+
   @OnEvent(AppEventEnum.ORDER_STATUS_UPDATED)
   async handlerOrderStatusUpdated({
     orderId,
@@ -210,20 +222,16 @@ export class BillingHandler {
     await this.orderService.update(orderId, { status });
     if (!order.billId) {
       this.logger.warn(`Order ${orderId} has no billId`);
+      return;
     }
-    // const orders = await this.orderService.getOrdersByBillId(order.billId);
-    // const billMessages = await this.messageService.getList({
-    //   where: { channelId: order.channelId, ownerId: order.ownerId },
-    // });
-    // const newContent = OrderFormHelper.generateOrderFormlMessage(orders || []);
-    // const mezonMessages = await Promise.all(
-    //   billMessages.map(async (billMsg) =>
-    //     this.mezonService.getMessageById(order.channelId, billMsg.messageId),
-    //   ),
-    // );
-    // await Promise.all(
-    //   mezonMessages.map(async (mezonMsg) => mezonMsg?.update(newContent)),
-    // );
+    const billId = order.billId;
+    // const channelId = order.channelId;
+    const bill = await this.billingService.getOne({
+      id: billId,
+    });
+    const ownerId = bill?.ownerId as string;
+    this.eventEmitter.emit(AppEventEnum.BILLING_UPDATED, billId);
+    this.eventEmitter.emit(AppEventEnum.DEPT_LIST_UPDATED, ownerId);
   }
 
   private getButonClickStatus(buttonId: string) {

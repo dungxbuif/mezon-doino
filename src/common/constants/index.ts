@@ -18,6 +18,9 @@ export enum AppEventEnum {
   CREATE_USER = 'user.create',
 
   ORDER_FORM_CREATED = 'order_form.created',
+
+  BILLING_UPDATED = 'billing.updated',
+  DEPT_LIST_UPDATED = 'dept_list.updated',
 }
 
 export const KOMU_CLAN_ID = '1779484504377790464';

@@ -14,4 +14,7 @@ export default class MessageEntity extends AbstractAuditEntity {
 
   @Column()
   channelId: string;
+
+  @Column({ default: null, nullable: true, type: 'int' })
+  billId: number | null;
 }

@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import BillingMessageEntity from '@src/common/database/message.entity';
+import MessageEntity from '@src/common/database/message.entity';
 import { FindManyOptions, FindOptionsWhere, Repository } from 'typeorm';
 
 @Injectable()
 export class MessageService {
   constructor(
-    @InjectRepository(BillingMessageEntity)
-    private billingMessageRepo: Repository<BillingMessageEntity>,
+    @InjectRepository(MessageEntity)
+    private billingMessageRepo: Repository<MessageEntity>,
   ) {}
-  async getList(options: FindManyOptions<BillingMessageEntity>) {
+  async getList(options: FindManyOptions<MessageEntity>) {
     return this.billingMessageRepo.find(options);
   }
 
-  async create(data: Partial<BillingMessageEntity>) {
+  async create(data: Partial<MessageEntity>) {
     const billingMessage = this.billingMessageRepo.create(data);
     return this.billingMessageRepo.save(billingMessage);
   }
@@ -26,8 +26,8 @@ export class MessageService {
       | number[]
       | Date
       | Date[]
-      | FindOptionsWhere<BillingMessageEntity>,
-    updateData: Partial<BillingMessageEntity>,
+      | FindOptionsWhere<MessageEntity>,
+    updateData: Partial<MessageEntity>,
   ) {
     await this.billingMessageRepo.update(criteria, updateData);
   }
@@ -39,7 +39,7 @@ export class MessageService {
       | number[]
       | Date
       | Date[]
-      | FindOptionsWhere<BillingMessageEntity>,
+      | FindOptionsWhere<MessageEntity>,
   ) {
     await this.billingMessageRepo.delete(criteria);
   }

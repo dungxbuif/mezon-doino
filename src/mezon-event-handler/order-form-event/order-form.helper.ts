@@ -2,6 +2,7 @@ import OrderEntity from '@src/common/database/order.entity';
 import { MezonFormKey, OrderStatus } from '@src/common/enums';
 import BillingButton from '@src/common/mezon-command/billing-button.command';
 import { getRandomColor } from '@src/common/utils';
+import { vnLocalDateTime } from '@src/common/utils/time.util';
 import {
   EButtonMessageStyle,
   EMessageComponentType,
@@ -27,7 +28,7 @@ export class OrderFormHelper {
             },
             {
               type: EMessageComponentType.BUTTON,
-              id: 'BillingButton.cancelKey',
+              id: BillingButton.cancelKey,
               component: {
                 label: 'HỦY ĐƠN',
                 style: EButtonMessageStyle.DANGER,
@@ -56,11 +57,11 @@ export class OrderFormHelper {
       }> = [];
       orders.forEach((ord, index) => {
         orderOptions.push({
-          label: `${ord.senderName}: order [${ord.content.toUpperCase()}]`,
+          label: `${ord.senderName}: order [${ord.content.toUpperCase()}] lúc ${vnLocalDateTime(ord.createdAt)}`,
           value: ord.id,
         });
         ordersList.push(
-          `${index + 1}. ${ord.senderName}: order [${ord.content.toUpperCase()}] ` +
+          `${index + 1}. ${ord.senderName}: order [${ord.content.toUpperCase()}] lúc ${vnLocalDateTime(ord.createdAt)}` +
             `${isPaid(ord.status) ? '✅' : ''} ${isCanceled(ord.status) ? '❌' : ''}`,
         );
       });

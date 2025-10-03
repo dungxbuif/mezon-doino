@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import BillEntity from '@src/common/database/bill.entity';
-import OrderEntity from '@src/common/database/order.entity';
 import { withinVnDayTypeOrmQuery } from '@src/common/utils/time.util';
 import { FindManyOptions, FindOptionsWhere, Repository } from 'typeorm';
 
@@ -20,14 +19,6 @@ export class BillingService {
     return this.billRepo.find(options);
   }
 
-  async getBillingOrdersByOrderId(orderId: string): Promise<OrderEntity[]> {
-    const bills = await this.billRepo
-      .createQueryBuilder('bill')
-      .leftJoinAndSelect('bill.orders', 'orders')
-      .where('orders.id = :orderId', { orderId })
-      .getMany();
-    return bills.flatMap((bill) => bill.orders);
-  }
   async getLatestBillByChannel(channelId: string) {
     return this.billRepo.findOne({
       where: {
